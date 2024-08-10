@@ -10,8 +10,7 @@ app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Настройка CORS для разрешения запросов с http://localhost:8000
-CORS(app, resources={r"/api/*": {"origins": "http://localhost:8000"}})
+CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"]}})
 
 # Подключения к базе данных PostreSQL
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://root:root@db:5432/PrintersProject'
