@@ -17,6 +17,7 @@ services:
     volumes:
       - ./app/:/home/app/
       - ./uploads:/uploads
+      - ./ssl:/ssl
     depends_on:
       - db
     networks:
