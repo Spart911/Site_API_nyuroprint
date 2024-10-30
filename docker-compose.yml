@@ -1,13 +1,6 @@
 version: "3"
 services:
-  nyuroprint:
-    build:
-      context: ./nyuroprint
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    networks:
-      - my_network
+
   web:
     build:
       context: .

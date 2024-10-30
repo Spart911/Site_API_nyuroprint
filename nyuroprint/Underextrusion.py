@@ -5,20 +5,13 @@ import zipfile
 from cryptography.fernet import Fernet
 import os
 
+# Загрузка модели и меток классов один раз при старте
+model = load_model("keras_model.h5", compile=True)
+with open("labels.txt", "r") as f:
+    class_names = f.readlines()
 
 def underextrusion(input_path):
-    # Загружаем модель
-    model = load_model("keras_model.h5", compile=False)
 
-    # # Удаляем расшифрованный архив
-    # os.remove('decrypted_model.zip')
-
-    # # Удаляем файл модели
-    # os.remove('keras_model.h5')
-
-
-    # Загружаем метки классов
-    class_names = open("labels.txt", "r").readlines()
 
     # Создаем массив правильной формы для передачи в модель Keras
     # 'length' или количество изображений, которые можно поместить в массив,

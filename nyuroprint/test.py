@@ -1,16 +1,12 @@
-import os
+import tensorflow as tf
+import tf2onnx
 
-def create_file(path):
-    try:
-        # Проверяем, существует ли директория, если нет, создаем ее
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+# Загрузка Keras-модели
+model = tf.keras.models.load_model("keras_model.h5")
 
-        with open(path, 'w') as file:
-            # Можно записать что-то в файл, если это необходимо
-            file.write("Пример текста в файле\n")
+# Конвертация Keras модели в ONNX формат
+model_proto, _ = tf2onnx.convert.from_keras(model, opset=13)
 
-        print(f"Файл успешно создан по пути: {path}")
-    except OSError as e:
-        print(f"Ошибка при создании файла: {e}")
-
-create_file('C:/Users/79509/Desktop/printerAPI/nyuroprint/input⁠/text.jpeg')
+# Сохранение ONNX-модели
+with open("model.onnx", "wb") as f:
+    f.write(model_proto.SerializeToString())
