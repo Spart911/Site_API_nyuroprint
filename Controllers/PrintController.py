@@ -65,7 +65,7 @@ class PrintController:
         with open(filepath, 'rb') as f:
             file_content = f.read()
         files = {'image': (str(filename), file_content)}
-        response = requests.post('http://83.221.210.29:3000/process_images', files=files)
+        response = requests.post('http://nyuroprint:3000/process_images', files=files)
         isDefectedImage = response.json().get('defect')
 
         try:

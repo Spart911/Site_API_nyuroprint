@@ -1,5 +1,19 @@
-# start by pulling the python image
-FROM python:3.10.14-slim
+FROM nvcr.io/nvidia/tensorflow:24.01-tf2-py3
+
+# Обновляем пакеты и устанавливаем необходимые зависимости
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    pkg-config \
+    libhdf5-dev \
+    python3-dev \
+    libhdf5-serial-dev \
+    hdf5-tools \
+    libhdf5-dev \
+    zlib1g-dev
+
+# Устанавливаем переменные среды для HDF5 и pkg-config
+ENV HDF5_DIR=/usr/include/hdf5/serial
+ENV PKG_CONFIG_PATH=/usr/lib/pkgconfig
 
 # install libgl1-mesa-glx and libglib2.0-0
 RUN apt-get update && apt-get install -y libgl1-mesa-glx libglib2.0-0
