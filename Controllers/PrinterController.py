@@ -1,75 +1,123 @@
-from flask import jsonify, request
-from Models.Printer import Printer, PrinterSchema, db
-import requests
+from fastapi import HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from typing import List, Optional, Dict, Any
+from Models.Printer import Printer, PrinterSchema
+from pydantic import BaseModel
+
+
+class PrinterCreate(BaseModel):
+    name: str
+    val_print_x: Optional[float] = None
+    val_print_y: Optional[float] = None
+    val_print_z: Optional[float] = None
+    view_table: Optional[str] = None
+    center_origin: Optional[bool] = None
+    table_heating: Optional[bool] = None
+    print_volume_heating: Optional[bool] = None
+    type_g_code: Optional[str] = None
+    min_x_head: Optional[float] = None
+    min_y_head: Optional[float] = None
+    max_x_head: Optional[float] = None
+    max_y_head: Optional[float] = None
+    height_portal: Optional[float] = None
+    displace_extruder: Optional[bool] = None
+    count_extruder: Optional[int] = None
+    start_g_code: Optional[str] = None
+    end_g_code: Optional[str] = None
+    extr_1_nozzle_diameter: Optional[float] = None
+    extr_1_filament_diameter: Optional[float] = None
+    extr_1_nozzle_displacement_x: Optional[float] = None
+    extr_1_nozzle_displacement_y: Optional[float] = None
+    extr_1_fan_number: Optional[int] = None
+    extr_1_start_g_code: Optional[str] = None
+    extr_1_end_g_code: Optional[str] = None
+    extr_2_nozzle_diameter: Optional[float] = None
+    extr_2_filament_diameter: Optional[float] = None
+    extr_2_nozzle_displacement_x: Optional[float] = None
+    extr_2_nozzle_displacement_y: Optional[float] = None
+    extr_2_fan_number: Optional[int] = None
+    extr_2_start_g_code: Optional[str] = None
+    extr_2_end_g_code: Optional[str] = None
 
 
 class PrinterController:
     @staticmethod
-    def get_printers():
-        printers = Printer.query.all()
-        printer_schema = PrinterSchema(many=True)
-        return jsonify({'message': 'OK', 'data': printer_schema.dump(printers)})
+    async def get_printers(session: AsyncSession):
+        try:
+            result = await session.execute(select(Printer))
+            printers = result.scalars().all()
+            printer_schema = PrinterSchema(many=True)
+            return {"message": "OK", "data": printer_schema.dump(printers)}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     @staticmethod
-    def get_printer(item_id):
-        printer = Printer.query.get(item_id)
-        if printer:
-            printer_schema = PrinterSchema()
-            return jsonify({'message': 'OK', 'data': printer_schema.dump(printer)})
-        else:
-            return jsonify({'message': 'Printer not found'}), 404
-
-    @staticmethod
-    def add_printer():
-        printer_schema = PrinterSchema()
-        new_printer_data = printer_schema.load(request.json)
-
-        if isinstance(new_printer_data, dict):  # Проверяем, является ли new_printer_data словарем (десериализованные данные без ошибок валидации)
-            # Создаем новый объект Printer, используя переданные данные и значения по умолчанию
-            new_printer = Printer(
-                name=new_printer_data['name'],
-                val_print_x=new_printer_data.get('val_print_x'),
-                val_print_y=new_printer_data.get('val_print_y'),
-                val_print_z=new_printer_data.get('val_print_z'),
-                view_table=new_printer_data.get('view_table'),
-                center_origin=new_printer_data.get('center_origin'),
-                table_heating=new_printer_data.get('table_heating'),
-                print_volume_heating=new_printer_data.get('print_volume_heating'),
-                type_g_code=new_printer_data.get('type_g_code'),
-                min_x_head=new_printer_data.get('min_x_head'),
-                min_y_head=new_printer_data.get('min_y_head'),
-                max_x_head=new_printer_data.get('max_x_head'),
-                max_y_head=new_printer_data.get('max_y_head'),
-                height_portal=new_printer_data.get('height_portal'),
-                displace_extruder=new_printer_data.get('displace_extruder'),
-                count_extruder=new_printer_data.get('count_extruder'),
-                start_g_code=new_printer_data.get('start_g_code'),
-                end_g_code=new_printer_data.get('end_g_code'),
-                extr_1_nozzle_diameter=new_printer_data.get('extr_1_nozzle_diameter'),
-                extr_1_filament_diameter=new_printer_data.get('extr_1_filament_diameter'),
-                extr_1_nozzle_displacement_x=new_printer_data.get('extr_1_nozzle_displacement_x'),
-                extr_1_nozzle_displacement_y=new_printer_data.get('extr_1_nozzle_displacement_y'),
-                extr_1_fan_number=new_printer_data.get('extr_1_fan_number'),
-                extr_1_start_g_code=new_printer_data.get('extr_1_start_g_code'),
-                extr_1_end_g_code=new_printer_data.get('extr_1_end_g_code'),
-                extr_2_nozzle_diameter=new_printer_data.get('extr_2_nozzle_diameter'),
-                extr_2_filament_diameter=new_printer_data.get('extr_2_filament_diameter'),
-                extr_2_nozzle_displacement_x=new_printer_data.get('extr_2_nozzle_displacement_x'),
-                extr_2_nozzle_displacement_y=new_printer_data.get('extr_2_nozzle_displacement_y'),
-                extr_2_fan_number=new_printer_data.get('extr_2_fan_number'),
-                extr_2_start_g_code=new_printer_data.get('extr_2_start_g_code'),
-                extr_2_end_g_code=new_printer_data.get('extr_2_end_g_code')
+    async def get_printer(session: AsyncSession, item_id: int):
+        try:
+            result = await session.execute(
+                select(Printer).filter(Printer.id == item_id)
             )
-            db.session.add(new_printer)
-            db.session.commit()
-            return jsonify({'message': 'Printer added successfully', 'printer_id': new_printer.id}), 201
-        else:
-            # Если в new_printer_data есть ошибки валидации, возвращаем их
-            return jsonify({'message': 'Validation error', 'errors': new_printer_data}), 400
+            printer = result.scalar_one_or_none()
+            if not printer:
+                raise HTTPException(status_code=404, detail="Printer not found")
+
+            printer_schema = PrinterSchema()
+            return {"message": "OK", "data": printer_schema.dump(printer)}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     @staticmethod
-    def create_default_printers(default_printers=None):
-        # Принтеры по умолчанию
+    async def add_printer(session: AsyncSession, printer_data: PrinterCreate):
+        try:
+            new_printer = Printer(
+                name=printer_data.name,
+                val_print_x=printer_data.val_print_x,
+                val_print_y=printer_data.val_print_y,
+                val_print_z=printer_data.val_print_z,
+                view_table=printer_data.view_table,
+                center_origin=printer_data.center_origin,
+                table_heating=printer_data.table_heating,
+                print_volume_heating=printer_data.print_volume_heating,
+                type_g_code=printer_data.type_g_code,
+                min_x_head=printer_data.min_x_head,
+                min_y_head=printer_data.min_y_head,
+                max_x_head=printer_data.max_x_head,
+                max_y_head=printer_data.max_y_head,
+                height_portal=printer_data.height_portal,
+                displace_extruder=printer_data.displace_extruder,
+                count_extruder=printer_data.count_extruder,
+                start_g_code=printer_data.start_g_code,
+                end_g_code=printer_data.end_g_code,
+                extr_1_nozzle_diameter=printer_data.extr_1_nozzle_diameter,
+                extr_1_filament_diameter=printer_data.extr_1_filament_diameter,
+                extr_1_nozzle_displacement_x=printer_data.extr_1_nozzle_displacement_x,
+                extr_1_nozzle_displacement_y=printer_data.extr_1_nozzle_displacement_y,
+                extr_1_fan_number=printer_data.extr_1_fan_number,
+                extr_1_start_g_code=printer_data.extr_1_start_g_code,
+                extr_1_end_g_code=printer_data.extr_1_end_g_code,
+                extr_2_nozzle_diameter=printer_data.extr_2_nozzle_diameter,
+                extr_2_filament_diameter=printer_data.extr_2_filament_diameter,
+                extr_2_nozzle_displacement_x=printer_data.extr_2_nozzle_displacement_x,
+                extr_2_nozzle_displacement_y=printer_data.extr_2_nozzle_displacement_y,
+                extr_2_fan_number=printer_data.extr_2_fan_number,
+                extr_2_start_g_code=printer_data.extr_2_start_g_code,
+                extr_2_end_g_code=printer_data.extr_2_end_g_code
+            )
+            session.add(new_printer)
+            await session.commit()
+            await session.refresh(new_printer)
+
+            return {
+                "message": "Printer added successfully",
+                "printer_id": new_printer.id
+            }
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @staticmethod
+    async def create_default_printers(session: AsyncSession):
         default_printers = [
             {
                 "name": "Ender 3",
@@ -97,7 +145,7 @@ class PrinterController:
                 "extr_1_fan_number": 1,
                 "extr_1_start_g_code": "Extruder 1 Start G-code",
                 "extr_1_end_g_code": "Extruder 1 End G-code",
-                "extr_2_nozzle_diameter": None,  # Параметры для второго экструдера
+                "extr_2_nozzle_diameter": None,
                 "extr_2_filament_diameter": None,
                 "extr_2_nozzle_displacement_x": None,
                 "extr_2_nozzle_displacement_y": None,
@@ -666,9 +714,12 @@ class PrinterController:
             }
         ]
             # Добавьте сколько угодно принтеров по умолчанию
+        try:
+            for printer_data in default_printers:
+                new_printer = Printer(**printer_data)
+                session.add(new_printer)
+            await session.commit()
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(status_code=500, detail=str(e))
 
-        # Добавление принтеров по умолчанию в базу данных
-        for printer_data in default_printers:
-            new_printer = Printer(**printer_data)
-            db.session.add(new_printer)
-        db.session.commit()

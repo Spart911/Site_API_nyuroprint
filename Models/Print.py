@@ -1,12 +1,18 @@
-from database import db
+from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import declarative_base, relationship
 from marshmallow import Schema, fields, validate
+from database import DataBase
 
-class Print(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    printer_id = db.Column(db.Integer, db.ForeignKey('printer.id'), nullable=False)
-    defect = db.Column(db.Integer, nullable=False)
-    img_path = db.Column(db.String(127), nullable=False)
-    quality = db.Column(db.Integer, nullable=False)
+class Print(DataBase):
+    __tablename__ = 'print'
+
+    id = Column(Integer, primary_key=True, index=True)
+    printer_id = Column(Integer, ForeignKey('printer.id'), nullable=False)
+    defect = Column(Integer, nullable=False)
+    img_path = Column(String(127), nullable=False)
+    quality = Column(Integer, nullable=False)
 
     def __init__(self, printer_id, defect, img_path, quality):
         self.printer_id = printer_id

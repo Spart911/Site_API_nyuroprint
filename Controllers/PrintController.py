@@ -1,84 +1,117 @@
 import os
-import requests
-from flask import jsonify, request
-from Models.Print import Print, PrintSchema, db
-from werkzeug.utils import secure_filename
+import aiofiles
+import aiohttp
+from fastapi import HTTPException, UploadFile, Form
+from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from Models.Print import Print, PrintSchema
+import aiofiles.os
+
 
 class PrintController:
-    @staticmethod
-    def allowed_file(filename):
-        ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
     @staticmethod
-    def get_prints():
-        prints = Print.query.all()
-        print_schema = PrintSchema(many=True)
-        return jsonify({'message': 'OK', 'data': print_schema.dump(prints)})
+    def allowed_file(filename: str) -> bool:
+        return '.' in filename and filename.rsplit('.', 1)[1].lower() in PrintController.ALLOWED_EXTENSIONS
 
     @staticmethod
-    def get_print(item_id):
-        selected_print = Print.query.get(item_id)
-        if selected_print:
+    async def get_prints(session: AsyncSession):
+        try:
+            result = await session.execute(select(Print))
+            prints = result.scalars().all()
+            print_schema = PrintSchema(many=True)
+            return {"message": "OK", "data": print_schema.dump(prints)}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @staticmethod
+    async def get_print(session: AsyncSession, item_id: int):
+        try:
+            result = await session.execute(select(Print).filter(Print.id == item_id))
+            selected_print = result.scalar_one_or_none()
+            if not selected_print:
+                raise HTTPException(status_code=404, detail="Print not found")
             print_schema = PrintSchema()
-            return jsonify({'message': 'OK', 'data': print_schema.dump(selected_print)})
-        else:
-            return jsonify({'message': 'Print not found'}), 404
+            return {"message": "OK", "data": print_schema.dump(selected_print)}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     @staticmethod
-    def add_print(app):
-        print_schema = PrintSchema()
-        request_data = request.form.to_dict()
+    async def add_print(
+            file: UploadFile,
+            session: AsyncSession,
+            upload_folder: str,
+            printer_id: int = Form(...),
+            quality: str = Form(...)
+    ):
+        # Проверка файла
+        if not file:
+            raise HTTPException(status_code=400, detail="No image part")
 
-        # Проверка наличия обязательных полей в запросе
-        required_fields = ['printer_id', 'quality']
-        missing_fields = [field for field in required_fields if field not in request_data]
+        if file.filename == "":
+            raise HTTPException(status_code=400, detail="No selected image")
 
-        if missing_fields:
-            return jsonify({'message': f'Missing required fields: {", ".join(missing_fields)}'}), 400
+        if not PrintController.allowed_file(file.filename):
+            raise HTTPException(status_code=400, detail="Invalid file type")
 
         try:
-            new_print_data = print_schema.load(request_data)
-        except Exception as e:
-            return jsonify({'message': 'Validation error', 'errors': str(e)}), 400
-
-        if 'img' not in request.files:
-            return jsonify({'message': 'No image part'}), 400
-
-        file = request.files['img']
-
-        if file.filename == '':
-            return jsonify({'message': 'No selected image'}), 400
-
-        if file and PrintController.allowed_file(file.filename):
+            # Создание безопасного имени файла
             filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            filepath = os.path.join(upload_folder, filename)
 
-            while os.path.exists(filepath):
-                filename = filename.rsplit('.', 1)[0] + '1' + '.' + filename.rsplit('.', 1)[1]
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            # Проверка существования файла и генерация уникального имени
+            while await aiofiles.os.path.exists(filepath):
+                name, ext = filename.rsplit('.', 1)
+                filename = f"{name}1.{ext}"
+                filepath = os.path.join(upload_folder, filename)
 
-            file.save(filepath)
-        else:
-            return jsonify({'message': 'Invalid file type'}), 400
+            # Асинхронное сохранение файла
+            async with aiofiles.open(filepath, 'wb') as f:
+                content = await file.read()
+                await f.write(content)
 
-        with open(filepath, 'rb') as f:
-            file_content = f.read()
-        files = {'image': (str(filename), file_content)}
-        response = requests.post('http://nyuroprint:3000/process_images', files=files)
-        isDefectedImage = response.json().get('defect')
+            # Асинхронный запрос к сервису обработки изображений
+            async with aiohttp.ClientSession() as session_http:
+                form = aiohttp.FormData()
+                form.add_field('image',
+                               content,
+                               filename=filename,
+                               content_type=file.content_type)
 
-        try:
+                async with session_http.post('http://nyuroprint:3000/process_images', data=form) as response:
+                    response_data = await response.json()
+                    is_defected_image = response_data.get('defect')
+
+            # Создание записи в базе данных
             new_print = Print(
-                printer_id=new_print_data['printer_id'],
-                defect=isDefectedImage,
+                printer_id=printer_id,
+                defect=is_defected_image,
                 img_path=filepath,
-                quality=new_print_data['quality']
+                quality=quality
             )
-            db.session.add(new_print)
-            db.session.commit()
+            session.add(new_print)
+            await session.commit()
+
+            return {
+                "message": "Print added successfully",
+                "print_id": new_print.id,
+                "defect": is_defected_image
+            }
+
         except Exception as e:
-            if os.path.exists(filepath):
-                os.remove(filepath)
-            return jsonify({'message': str(e)}), 400
-        return jsonify({'message': 'Print added successfully', 'print_id': new_print.id, 'defect': isDefectedImage}), 201
+            await session.rollback()
+            # Удаление файла в случае ошибки
+            if await aiofiles.os.path.exists(filepath):
+                await aiofiles.os.remove(filepath)
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @staticmethod
+    def secure_filename(filename: str) -> str:
+        """
+        Безопасное преобразование имени файла
+        """
+        filename = filename.replace(" ", "_")
+        filename = "".join(c for c in filename if c.isalnum() or c in "._-")
+        return filename

@@ -1,7 +1,10 @@
-FROM python:3.10 AS builder
+FROM python:3.12 AS builder
 
 COPY . .
-RUN pip install -r requirements.txt
+
+# Обновляем pip и устанавливаем зависимости
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 5000
 

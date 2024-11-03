@@ -1,3 +1,4 @@
-from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import declarative_base
 
-db = SQLAlchemy()
+# Определение базового класса
+DataBase = declarative_base()
