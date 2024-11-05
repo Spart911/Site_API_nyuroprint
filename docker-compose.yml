@@ -24,6 +24,8 @@ services:
       stack:
         soft: 67108864
         hard: 67108864
+    volumes:
+      - ./nyuroprint:/ai
   web:
     build:
       context: .

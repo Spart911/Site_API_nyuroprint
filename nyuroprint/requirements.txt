@@ -2,9 +2,17 @@ absl-py==1.0.0
 annotated-types==0.6.0
 argon2-cffi==23.1.0
 argon2-cffi-bindings==21.2.0
+aiofiles==24.1.0
+anyio==4.6.2.post1
 asttokens==2.4.1
 astunparse==1.6.3
+uvicorn==0.32.0
+python-multipart==0.0.17
+asyncio==3.4.3
 beautifulsoup4==4.12.2
+aiohttp==3.10.10
+asyncpg==0.29.0
+fastapi==0.115.4
 bleach==6.1.0
 blinker==1.8.2
 cffi==1.16.0
@@ -17,8 +25,6 @@ dm-tree==0.1.8
 exceptiongroup==1.2.0
 executing==2.0.1
 fastjsonschema==2.19.1
-Flask==3.0.3
-Flask-Cors==5.0.0
 flatbuffers==23.5.26
 gast==0.4.0
 google-auth==2.26.1

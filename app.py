@@ -1,23 +1,18 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, UploadFile, File, Depends
+from fastapi import FastAPI, UploadFile, File, Depends, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uvicorn
 from Controllers.PrinterController import PrinterController
 from Controllers.PrintController import PrintController
 from Models.Printer import Printer
 from Models.Print import Print
+from database import DataBase, AsyncSessionLocal, engine, get_db  # Импортируйте engine и AsyncSessionLocal
+from fastapi.responses import JSONResponse
+
 
 UPLOAD_FOLDER = 'uploads'
-DATABASE_URL = "postgresql+asyncpg://root:root@db:5432/PrintersProject"
-
-# Создаем асинхронный движок и сессию
-engine = create_async_engine(DATABASE_URL, echo=True)
-AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-from database import DataBase
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -59,11 +54,6 @@ async def add_csp_header(request, call_next):
     response.headers['Content-Security-Policy'] = csp
     return response
 
-# Dependency для получения сессии базы данных
-async def get_db():
-    async with AsyncSessionLocal() as session:
-        yield session
-
 # Роуты для принтеров
 @app.get("/api/printers/")
 async def get_printers(session: AsyncSession = Depends(get_db)):
@@ -83,8 +73,19 @@ async def get_prints(session: AsyncSession = Depends(get_db)):
     return await PrintController.get_prints(session)
 
 @app.post("/api/prints/")
-async def add_print(file: UploadFile = File(...), session: AsyncSession = Depends(get_db)):
-    return await PrintController.add_print(file, session, UPLOAD_FOLDER)
+async def add_print(
+    img: UploadFile,
+    printer_id: int = Form(...),  # Добавлено получение printer_id из формы
+    quality: int = Form(...),      # Добавлено получение quality из формы
+    session: AsyncSession = Depends(get_db)
+):
+    try:
+        response = await PrintController.add_print(img, printer_id, quality, session, UPLOAD_FOLDER)
+        return JSONResponse(content=response, status_code=201)  # Успешный ответ с кодом 201
+    except HTTPException as http_ex:
+        raise http_ex  # Повторно выбрасываем HTTP исключения
+    except Exception as ex:
+        return JSONResponse(content={"message": str(ex)}, status_code=500)  # Обработка общих исключений
 
 @app.get("/api/prints/{item_id}")
 async def get_print(item_id: int, session: AsyncSession = Depends(get_db)):

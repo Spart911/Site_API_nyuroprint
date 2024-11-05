@@ -1,23 +1,38 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, ImageOps
+import os
+import logging
+import asyncio
+import uvicorn
+import aiofiles
+
 import remove_bg as rb
 import image_editor as ie
 import Underextrusion as un
-import os
-import logging
 
 # Конфигурация логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-detector = un.UnderextrusionDetector(
+def get_detector():
+    """Ленивая инициализация детектора"""
+    if not hasattr(app.state, "detector"):
+        app.state.detector = un.UnderextrusionDetector(
             model_path="tensorrt_optimized_model",
             labels_path="labels.txt"
         )
+    return app.state.detector
 
 # Создание директории для входящих изображений
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -25,66 +40,68 @@ input_dir = os.path.join(script_dir, 'input')
 os.makedirs(input_dir, exist_ok=True)
 
 
-@app.route('/process_images', methods=['POST'])
-def process_images():
-    # Проверяем, было ли передано изображение
-    if 'image' not in request.files:
-        logger.error('No image provided')
-        return jsonify({'error': 'No image provided'}), 400
-
-    # Получаем файл из запроса
-    image = request.files['image']
-    image_path = os.path.join(input_dir, image.filename)
-
+@app.post("/process_images")
+async def process_images_endpoint(image: UploadFile = File(...)):
     # Сохраняем изображение
-    image.save(image_path)
-
+    image_path = os.path.join(input_dir, image.filename)
     try:
-        # Изменяем размер изображения до 224x224
-        resize_image(image_path)
+        print("async file open start")
+        async with aiofiles.open(image_path, "wb") as buffer:
+            await buffer.write(await image.read())
+        print("async file open stop")
 
-        # Выполняем обработку изображений
-        rb.Dremove_bg(input_dir, input_dir)
-        ie.process_images(input_dir, input_dir)
+        print("async resize_image start")
+        await resize_image(image_path)
+        print("async resize_image stop")
 
-        prediction_result = detector.predict(input_dir)
+        print("async обработка изображений start")
+        await asyncio.gather(
+            rb.Dremove_bg(input_dir, input_dir),
+            ie.process_images(input_dir, input_dir)
+        )
+        print(f"async обработка изображений sto---------------p")
 
-        # Извлекаем имя файла из prediction_result и предсказание для этого файла
+        # Инициализируем детектор при первом обращении
+        detector = get_detector()
+
+        # Выполняем предсказание для конкретного изображени
+        # prediction_result = detector.predict(image_path)
+        prediction_result = await asyncio.to_thread(detector.predict, image_path)  # Изменено на image_path
+
+        # Извлекаем имя файла и предсказание
         file_name = os.path.basename(image_path)
-        file_prediction = prediction_result.get(file_name)
+        file_prediction = prediction_result.get('class_name')  # Предполагаем, что возвращается только одно предсказание
 
-        # Проверка на наличие предсказания и ключа 'class_name'
-        if file_prediction and 'class_name' in file_prediction:
-            defect = file_prediction['class_name']
+        if file_prediction:
+            defect_str = str(file_prediction)
+            defect_int = int(defect_str[0]) if defect_str else 0
+
+            logger.info('Images processed successfully')
+            return JSONResponse(content={'message': 'Images processed successfully', 'defect': defect_int},
+                                status_code=200)
         else:
-            logger.error(f'Prediction result for "{file_name}" does not contain "class_name": {prediction_result}')
-            return jsonify({'error': f'Prediction result for "{file_name}" does not contain "class_name": {prediction_result}'}), 500
+            logger.error(f'No valid prediction found for "{file_name}": {prediction_result}')
+            raise HTTPException(status_code=500, detail='No valid prediction found')
 
-        # Удаляем изображение после обработки
-        os.remove(image_path)
-
-        defect_str = str(defect)
-        print("defect_str =")
-        print(defect_str)
-        defect_int = int(defect_str[0]) if defect_str else 0
-
-        logger.info('Images processed successfully')
-        return jsonify({'message': 'Images processed successfully', 'defect': defect_int}), 200
     except Exception as e:
         logger.error(f'Error processing image: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-def resize_image(image_path):
-    """Изменяет размер изображения до 224x224."""
+async def resize_image(image_path):
+    """Изменяет размер изображения до 224x224 асинхронно."""
+    await asyncio.to_thread(_resize_and_save_image, image_path)
+
+def _resize_and_save_image(image_path):
+    """Синхронная функция для изменения размера изображения, вызываемая из асинхронного контекста."""
     image = Image.open(image_path).convert("RGB")
     size = (224, 224)
     resized_image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
     resized_image.save(image_path)
 
-
-# Запускаем Flask-приложение
 if __name__ == "__main__":
-    # Запуск с помощью Gunicorn
-    app.run(host='0.0.0.0', port=3000, debug=False)  # Убедитесь, что debug=False для продакшена
-
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=3000,
+    )

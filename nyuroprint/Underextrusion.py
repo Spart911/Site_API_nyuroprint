@@ -2,16 +2,32 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image, ImageOps
 import os
+import asyncio
 from tensorflow.python.compiler.tensorrt import trt_convert as trt
-
+import aiofiles
+import shutil
+cache_path = "/tmp/tensorrt/"
+if os.path.exists(cache_path):
+    shutil.rmtree(cache_path)
+    print("Cleared TensorRT cache.")
 
 class UnderextrusionDetector:
     def __init__(self, model_path="tensorrt_optimized_model", labels_path="labels.txt"):
+        # Удаляем старую оптимизированную модель, если она существует
+        optimized_model_path = model_path + "_optimized"
+        if os.path.exists(optimized_model_path):
+            try:
+                shutil.rmtree(optimized_model_path)  # Удаляем директорию и все её содержимое
+                print(f"Удалена старая модель: {optimized_model_path}")
+            except OSError as e:
+                print(f"Ошибка при удалении директории {optimized_model_path}: {e}")
+        print("dkokdsolskdl")
         # Инициализация конвертера TensorRT
         self.converter = trt.TrtGraphConverterV2(
             input_saved_model_dir=model_path,
             precision_mode=trt.TrtPrecisionMode.FP16,
-            use_calibration=True
+            use_calibration=True,
+            allow_build_at_runtime=True
         )
 
         # Конвертация и сохранение модели
@@ -20,11 +36,11 @@ class UnderextrusionDetector:
 
         # Сохранение оптимизированной модели
         print("Saving optimized model...")
-        self.converter.save(model_path + "_optimized")
+        self.converter.save(optimized_model_path)
 
         # Загрузка оптимизированной модели
         print("Loading optimized model...")
-        self.model = tf.saved_model.load(model_path + "_optimized")
+        self.model = tf.saved_model.load(optimized_model_path)
         self.predict_fn = self.model.signatures['serving_default']
 
         # Загрузка меток классов
@@ -32,44 +48,13 @@ class UnderextrusionDetector:
         with open(labels_path, "r") as f:
             self.class_names = [line.strip() for line in f.readlines()]
 
-    def preprocess_image(self, image_path):
-        """Предобработка изображения для модели."""
-        try:
-            size = (224, 224)
-            image = Image.open(image_path).convert("RGB")
-            image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
-            image_array = np.asarray(image).astype(np.float32)
-            normalized_image_array = (image_array / 127.5) - 1
-            return normalized_image_array
-        except Exception as e:
-            raise Exception(f"Error preprocessing image: {str(e)}")
-
-    def predict(self, input_path, confidence_threshold=0.5):
-        """
-        Выполняет предсказание для изображения или директории с изображениями.
-
-        Args:
-            input_path: путь к изображению или директории
-            confidence_threshold: порог уверенности для предсказания
-
-        Returns:
-            dict: результаты предсказания
-        """
-        try:
-            if os.path.isfile(input_path):
-                return self._predict_single(input_path, confidence_threshold)
-            elif os.path.isdir(input_path):
-                return self._predict_directory(input_path, confidence_threshold)
-            else:
-                raise ValueError(f"Invalid input path: {input_path}")
-
-        except Exception as e:
-            raise Exception(f"Prediction error: {str(e)}")
-
-    def _predict_single(self, image_path, confidence_threshold):
+    def predict(self, image_path, confidence_threshold=0.5):
         """Предсказание для одного изображения."""
+        print("Старт предсказания")
+        print("Старт preprocess_image")
         # Предобработка изображения
         data = self.preprocess_image(image_path)
+        print("Конец preprocess_image")
         data = np.expand_dims(data, axis=0)
 
         # Выполнение предсказания
@@ -99,35 +84,22 @@ class UnderextrusionDetector:
             }
 
         except Exception as e:
+            print(f"ошибка предсказания {str(e)}")
             return {
                 'status': 'error',
                 'message': f'Prediction failed: {str(e)}'
             }
 
-    def _predict_directory(self, directory_path, confidence_threshold):
-        """Предсказание для директории с изображениями."""
-        results = {}
-        for filename in os.listdir(directory_path):
-            if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-                file_path = os.path.join(directory_path, filename)
-                results[filename] = self._predict_single(file_path, confidence_threshold)
-        return results
-
-
-# Пример использования:
-if __name__ == "__main__":
-    try:
-        # Инициализация детектора
-        detector = UnderextrusionDetector(
-            model_path="tensorrt_optimized_model",
-            labels_path="labels.txt"
-        )
-
-        # Пример предсказания для одного изображения
-        result = detector.predict("def_no.jpg")
-        print("Single image prediction:", result)
-
-
-
-    except Exception as e:
-        print(f"Error: {str(e)}")
+    def preprocess_image(self, image_path):
+        """Предобработка изображения для модели."""
+        try:
+            print("BLAAA")
+            size = (224, 224)
+            image = Image.open(image_path).convert("RGB")
+            image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
+            image_array = np.asarray(image).astype(np.float32)
+            normalized_image_array = (image_array / 127.5) - 1
+            return normalized_image_array
+        except Exception as e:
+            print(f"Exception ----- {str(e)}")
+            raise Exception(f"Error preprocessing image: {str(e)}")
