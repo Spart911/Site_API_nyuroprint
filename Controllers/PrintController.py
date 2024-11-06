@@ -1,4 +1,5 @@
 import os
+import uuid
 import aiofiles
 import aiohttp
 from fastapi import HTTPException, UploadFile, Form, Depends
@@ -58,9 +59,10 @@ class PrintController:
 
         try:
             # Проверка существования файла и генерация уникального имени
-            while os.path.exists(filepath):  # Используйте стандартный os
+            while os.path.exists(filepath):
                 name, ext = filename.rsplit('.', 1)
-                filename = f"{name}_1.{ext}"
+                unique_id = str(uuid.uuid4())
+                filename = f"{name}_{unique_id}.{ext}"
                 filepath = os.path.join(upload_folder, filename)
 
             # Асинхронное сохранение файла

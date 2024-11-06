@@ -15,13 +15,7 @@ class UnderextrusionDetector:
     def __init__(self, model_path="tensorrt_optimized_model", labels_path="labels.txt"):
         # Удаляем старую оптимизированную модель, если она существует
         optimized_model_path = model_path + "_optimized"
-        if os.path.exists(optimized_model_path):
-            try:
-                shutil.rmtree(optimized_model_path)  # Удаляем директорию и все её содержимое
-                print(f"Удалена старая модель: {optimized_model_path}")
-            except OSError as e:
-                print(f"Ошибка при удалении директории {optimized_model_path}: {e}")
-        print("dkokdsolskdl")
+
         # Инициализация конвертера TensorRT
         self.converter = trt.TrtGraphConverterV2(
             input_saved_model_dir=model_path,
@@ -50,11 +44,9 @@ class UnderextrusionDetector:
 
     def predict(self, image_path, confidence_threshold=0.5):
         """Предсказание для одного изображения."""
-        print("Старт предсказания")
-        print("Старт preprocess_image")
+
         # Предобработка изображения
         data = self.preprocess_image(image_path)
-        print("Конец preprocess_image")
         data = np.expand_dims(data, axis=0)
 
         # Выполнение предсказания
@@ -93,7 +85,6 @@ class UnderextrusionDetector:
     def preprocess_image(self, image_path):
         """Предобработка изображения для модели."""
         try:
-            print("BLAAA")
             size = (224, 224)
             image = Image.open(image_path).convert("RGB")
             image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)

@@ -45,27 +45,19 @@ async def process_images_endpoint(image: UploadFile = File(...)):
     # Сохраняем изображение
     image_path = os.path.join(input_dir, image.filename)
     try:
-        print("async file open start")
         async with aiofiles.open(image_path, "wb") as buffer:
             await buffer.write(await image.read())
-        print("async file open stop")
 
-        print("async resize_image start")
         await resize_image(image_path)
-        print("async resize_image stop")
 
-        print("async обработка изображений start")
         await asyncio.gather(
-            rb.Dremove_bg(input_dir, input_dir),
-            ie.process_images(input_dir, input_dir)
+            rb.Dremove_bg(input_dir, input_dir, image_name=image.filename),
+            ie.process_single_image(input_dir, input_dir, file_name=image.filename)
         )
-        print(f"async обработка изображений sto---------------p")
 
         # Инициализируем детектор при первом обращении
         detector = get_detector()
 
-        # Выполняем предсказание для конкретного изображени
-        # prediction_result = detector.predict(image_path)
         prediction_result = await asyncio.to_thread(detector.predict, image_path)  # Изменено на image_path
 
         # Извлекаем имя файла и предсказание

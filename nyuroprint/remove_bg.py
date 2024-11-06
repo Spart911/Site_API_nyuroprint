@@ -2,7 +2,6 @@ import argparse
 import cv2
 import os
 import numpy as np
-import _utils
 import asyncio
 
 
@@ -60,22 +59,22 @@ async def remove_bg(image_name, in_path="img", out_path="out", main_rect_size=.0
     cv2.imwrite(os.path.join(out_path, image_name), masked)
 
 
-async def Dremove_bg(input_path, output_path):
-    parser = argparse.ArgumentParser(description='Удаление фона с изображений.')
-    parser.add_argument('-p', '--path', default=input_path, type=str, help='Путь к папке с изображениями')
-    parser.add_argument('-o', '--out', default=output_path, type=str, help='Папка для результатов')
+async def Dremove_bg(input_path, output_path, image_name):
+    parser = argparse.ArgumentParser(description='Удаление фона с изображения.')
+    parser.add_argument('-p', '--path', default=input_path, type=str, help='Путь к папке с изображением')
+    parser.add_argument('-o', '--out', default=output_path, type=str, help='Папка для сохранения результата')
+    parser.add_argument('-n', '--name', default=image_name, type=str, help='Имя файла для обработки')
     parser.add_argument('-b', '--bgrectsize', default=0.07, type=float,
-                        help='Отступу от краев изображения точно считающийся фоном')
+                        help='Отступ от краев изображения, считающийся фоном')
     parser.add_argument('-f', '--fgrect', default=0.4, type=int,
-                        help='Процент изображения (область в центре), точно считающийся НЕ фоном')
+                        help='Процент изображения (область в центре), считающийся НЕ фоном')
     parser.add_argument('-r', '--resize', default=500, type=int,
                         help='Изменить размер изображения к заданному (по меньшей стороне). 0 - не менять размер')
 
     args = parser.parse_args()
     inPath, outPath = args.path, args.out
+    image_name = args.name
     bg_rect_size, fg_rect_size, resize = args.bgrectsize, args.fgrect, args.resize
 
-    files = os.listdir(inPath)
-    tasks = [remove_bg(filename, inPath, outPath, bg_rect_size, fg_rect_size, resize) for filename in files]
-
-    await asyncio.gather(*tasks)  # Асинхронное выполнение всех задач
+    # Обработка одного изображения
+    await remove_bg(image_name, inPath, outPath, bg_rect_size, fg_rect_size, resize)
