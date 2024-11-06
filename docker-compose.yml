@@ -33,7 +33,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ./app/:/home/app/
+      - ./.:/home/app/
       - ./uploads:/uploads
       - ./ssl:/ssl
     depends_on:
