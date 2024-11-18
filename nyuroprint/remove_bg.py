@@ -1,11 +1,9 @@
-import argparse
 import cv2
 import os
 import numpy as np
 import asyncio
 
-
-async def remove_bg(image_name, in_path="img", out_path="out", main_rect_size=.02, fg_size=4, resize_to=500):
+async def remove_bg(image_name, in_path="img", out_path="out", main_rect_size=0.02, fg_size=4, resize_to=500):
     img = cv2.imread(os.path.join(in_path, image_name))
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -58,23 +56,6 @@ async def remove_bg(image_name, in_path="img", out_path="out", main_rect_size=.0
     masked = cv2.cvtColor(masked, cv2.COLOR_RGB2BGR)
     cv2.imwrite(os.path.join(out_path, image_name), masked)
 
-
-async def Dremove_bg(input_path, output_path, image_name):
-    parser = argparse.ArgumentParser(description='Удаление фона с изображения.')
-    parser.add_argument('-p', '--path', default=input_path, type=str, help='Путь к папке с изображением')
-    parser.add_argument('-o', '--out', default=output_path, type=str, help='Папка для сохранения результата')
-    parser.add_argument('-n', '--name', default=image_name, type=str, help='Имя файла для обработки')
-    parser.add_argument('-b', '--bgrectsize', default=0.07, type=float,
-                        help='Отступ от краев изображения, считающийся фоном')
-    parser.add_argument('-f', '--fgrect', default=0.4, type=int,
-                        help='Процент изображения (область в центре), считающийся НЕ фоном')
-    parser.add_argument('-r', '--resize', default=500, type=int,
-                        help='Изменить размер изображения к заданному (по меньшей стороне). 0 - не менять размер')
-
-    args = parser.parse_args()
-    inPath, outPath = args.path, args.out
-    image_name = args.name
-    bg_rect_size, fg_rect_size, resize = args.bgrectsize, args.fgrect, args.resize
-
-    # Обработка одного изображения
-    await remove_bg(image_name, inPath, outPath, bg_rect_size, fg_rect_size, resize)
+async def Dremove_bg(input_path, output_path, image_name, bg_rect_size=0.07, fg_size=0.4, resize=224):
+    # Вызываем функцию обработки с передачей аргументов
+    await remove_bg(image_name, input_path, output_path, bg_rect_size, fg_size, resize)

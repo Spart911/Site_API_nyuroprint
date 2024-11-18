@@ -91,13 +91,4 @@ async def add_print(
 async def get_print(item_id: int, session: AsyncSession = Depends(get_db)):
     return await PrintController.get_print(session, item_id)
 
-# Запуск приложения
-if __name__ == "__main__":
-    uvicorn.run(
-        "app:app",
-        host="0.0.0.0",
-        port=5000,
-        reload=True,
-        ssl_keyfile='ssl/certificate.key.pem',
-        ssl_certfile='ssl/certificate.crt.pem'
-    )
+

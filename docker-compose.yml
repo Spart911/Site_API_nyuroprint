@@ -48,5 +48,22 @@ services:
     networks:
       - my_network
 
+  tg_support:  # Поменяли имя сервиса на tg_support
+      build:
+        context: ./tg_support_site  # Папка с вашим приложением
+        dockerfile: Dockerfile        # Dockerfile для tg_support_site
+      ports:
+        - "8765:8765"  # Порт для вашего приложения FastAPI
+      volumes:
+        - ./tg_support_site:/home/app
+        - ./.env:/app/.env  # Подключаем .env файл
+        - ./ssl:/ssl
+      networks:
+        - my_network
+      depends_on:
+        - db
+      environment:
+        - PYTHONUNBUFFERED=1
+
 networks:
   my_network:

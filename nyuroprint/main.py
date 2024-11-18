@@ -11,6 +11,8 @@ import aiofiles
 import remove_bg as rb
 import image_editor as ie
 import Underextrusion as un
+from Underextrusion import detector
+
 
 # Конфигурация логирования
 logging.basicConfig(level=logging.INFO)
@@ -25,14 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def get_detector():
-    """Ленивая инициализация детектора"""
-    if not hasattr(app.state, "detector"):
-        app.state.detector = un.UnderextrusionDetector(
-            model_path="tensorrt_optimized_model",
-            labels_path="labels.txt"
-        )
-    return app.state.detector
+
 
 # Создание директории для входящих изображений
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -55,8 +50,7 @@ async def process_images_endpoint(image: UploadFile = File(...)):
             ie.process_single_image(input_dir, input_dir, file_name=image.filename)
         )
 
-        # Инициализируем детектор при первом обращении
-        detector = get_detector()
+
 
         prediction_result = await asyncio.to_thread(detector.predict, image_path)  # Изменено на image_path
 
@@ -91,9 +85,4 @@ def _resize_and_save_image(image_path):
     resized_image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
     resized_image.save(image_path)
 
-if __name__ == "__main__":
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=3000,
-    )
+

@@ -32,6 +32,4 @@ COPY . /ai
 
 EXPOSE 3000
 
-# configure the container to run in an executed manner
-ENTRYPOINT ["python"]
-CMD ["main.py"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "3000", "--workers", "10", "--proxy-headers", "--forwarded-allow-ips", "*", "--reload"]

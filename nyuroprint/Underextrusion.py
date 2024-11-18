@@ -94,3 +94,7 @@ class UnderextrusionDetector:
         except Exception as e:
             print(f"Exception ----- {str(e)}")
             raise Exception(f"Error preprocessing image: {str(e)}")
+detector = UnderextrusionDetector(
+            model_path="tensorrt_optimized_model",
+            labels_path="labels.txt"
+        )
